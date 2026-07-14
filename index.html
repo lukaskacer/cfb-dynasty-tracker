@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CFB Dynasty Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1"></script>
+<style>
+:root{
+  --bg:#f4f5f2; --card:#ffffff; --field:#14532d; --field-dark:#0e3d21;
+  --line:#e2e5e0; --text:#1c2321; --muted:#6b7570;
+  --lukas:#8a2432; --noah:#5a2d81; --caleb:#0a6640;
+  --gold:#c9a227; --pos:#1a7f4b; --neg:#c0392b; --radius:10px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+header{background:var(--field);color:#fff;border-radius:var(--radius);padding:18px 24px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-bottom:4px solid var(--gold)}
+header h1{font-size:20px;font-weight:700;letter-spacing:.3px}
+header .sub{font-size:12px;color:#c8dccb}
+.hdr-btns{display:flex;gap:8px}
+.hdr-btns button{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer}
+.hdr-btns button:hover{background:rgba(255,255,255,.22)}
+nav{display:flex;gap:6px;margin-bottom:14px}
+nav button{flex:1;padding:11px;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer}
+nav button.active{background:var(--field);color:#fff;border-color:var(--field)}
+.card{background:var(--card);border-radius:var(--radius);padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:14px}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:14px}
+.kpi{background:var(--card);border-radius:var(--radius);padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,.07);border-top:4px solid var(--accent,#888)}
+.kpi .name{font-size:15px;font-weight:700}
+.kpi .team{font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.kpi .score{font-size:34px;font-weight:800}
+.kpi .rank{font-size:12px;font-weight:600;color:var(--gold)}
+h2{font-size:15px;font-weight:700;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--line);font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+td{padding:8px 10px;border-bottom:1px solid #f0f1ee}
+tr:last-child td{border-bottom:none}
+.leader{font-weight:700;color:var(--pos)}
+.season-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.pcard{background:var(--card);border-radius:var(--radius);box-shadow:0 1px 3px rgba(0,0,0,.07);border-top:4px solid var(--accent);overflow:hidden}
+.pcard .phead{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
+.pcard .phead .nm{font-weight:700;font-size:15px}
+.pcard .phead .sc{font-size:22px;font-weight:800}
+.pcard .team-edit{padding:8px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.pcard .team-edit input{flex:1;border:1px solid var(--line);border-radius:5px;padding:4px 8px;font-size:13px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:7px 16px;border-bottom:1px solid #f4f5f2;font-size:13px}
+.row:last-child{border-bottom:none}
+.row .lbl{display:flex;align-items:center;gap:7px}
+.pts{font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;background:#e8f3ec;color:var(--pos);white-space:nowrap}
+.pts.minus{background:#fbeae8;color:var(--neg)}
+.tgl{width:40px;height:22px;border-radius:99px;background:#d7dbd5;border:none;cursor:pointer;position:relative;transition:background .15s;flex-shrink:0}
+.tgl::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.tgl.on{background:var(--pos)}
+.tgl.on.neg{background:var(--neg)}
+.tgl.on::after{left:20px}
+.stepper{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.stepper button{width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:#fafbf9;font-size:15px;font-weight:700;cursor:pointer;color:var(--text)}
+.stepper button:hover{background:#eef0ec}
+.stepper .val{min-width:18px;text-align:center;font-weight:700;font-size:14px}
+.finalize-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.finalize-bar .info{font-size:13px;color:var(--muted)}
+.btn{background:var(--field);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+.btn:hover{background:var(--field-dark)}
+.btn.ghost{background:#fff;color:var(--neg);border:1px solid var(--neg);font-size:12px;padding:7px 14px}
+.key-table td:first-child{font-weight:700;white-space:nowrap;width:70px}
+.key-pos{color:var(--pos)} .key-neg{color:var(--neg)}
+.note{font-size:12.5px;color:var(--muted);margin-top:10px}
+.chart-box{position:relative;height:280px}
+.empty{color:var(--muted);font-size:13.5px;font-style:italic}
+footer{text-align:center;font-size:11.5px;color:var(--muted);padding:8px 0 20px}
+@media(max-width:640px){.kpi .score{font-size:28px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>&#127944; CFB Dynasty Tracker</h1>
+      <div class="sub">Lukas &middot; Noah &middot; Caleb &middot; <span id="syncBadge">Loading&hellip;</span></div>
+    </div>
+    <div class="hdr-btns">
+      <button onclick="exportData()">Export save</button>
+      <button onclick="document.getElementById('importFile').click()">Import save</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
+  </header>
+
+  <nav>
+    <button id="tab-home" class="active" onclick="showTab('home')">Home</button>
+    <button id="tab-season" onclick="showTab('season')">Current season</button>
+    <button id="tab-key" onclick="showTab('key')">Point key</button>
+  </nav>
+
+  <div id="page-home">
+    <div class="card" style="text-align:center;font-style:italic;font-size:15px;color:var(--field);border-left:4px solid var(--gold);border-radius:0 var(--radius) var(--radius) 0">Building dynasties, the ocky way</div>
+    <div class="kpi-row" id="kpiRow"></div>
+    <div class="card">
+      <h2>Score by season</h2>
+      <div class="chart-box"><canvas id="seasonChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Season history</h2>
+      <div id="historyTable"></div>
+    </div>
+  </div>
+
+  <div id="page-season" style="display:none">
+    <div class="card finalize-bar">
+      <div class="info"><strong id="seasonLabel"></strong> &mdash; enter points as they happen. Finalizing locks this season into history and starts the next one.</div>
+      <button class="btn" onclick="finalizeSeason()">Finalize season</button>
+    </div>
+    <div class="season-grid" id="seasonGrid"></div>
+    <div class="card" id="undoCard" style="display:none">
+      <div class="finalize-bar">
+        <div class="info">Made a mistake finalizing? You can reopen the most recent season.</div>
+        <button class="btn ghost" onclick="undoFinalize()">Reopen last season</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-key" style="display:none">
+    <div class="card">
+      <h2>How points are scored each season</h2>
+      <table class="key-table">
+        <tr><td class="key-pos">+5</td><td>Win the national championship</td></tr>
+        <tr><td class="key-pos">+3</td><td>Heisman winner</td></tr>
+        <tr><td class="key-pos">+1</td><td>Win conference championship</td></tr>
+        <tr><td class="key-pos">+1</td><td>Per playoff win <em>(stacks)</em></td></tr>
+        <tr><td class="key-pos">+1</td><td>Top offense in the country (points per game)</td></tr>
+        <tr><td class="key-pos">+1</td><td>Top defense in the country (points per game allowed)</td></tr>
+        <tr><td class="key-pos">+1</td><td>Per head-to-head win vs. Lukas / Noah / Caleb <em>(stacks)</em></td></tr>
+        <tr><td class="key-pos">+1</td><td>Per win over a top-25 team <em>(stacks)</em></td></tr>
+        <tr><td class="key-pos">+1</td><td>#1 recruiting class in the country</td></tr>
+        <tr><td class="key-pos">+1</td><td>Top-25 recruiting class</td></tr>
+        <tr><td class="key-neg">&minus;1</td><td>Most turnovers</td></tr>
+        <tr><td class="key-neg">&minus;1</td><td>Finish below the top half of your conference</td></tr>
+      </table>
+      <div class="note">Top offense/defense is measured against the whole country, not just the three dynasty teams. Playoff wins, head-to-head wins, and top-25 wins can all be earned multiple times in a season.</div>
+    </div>
+  </div>
+
+  <footer>Saved automatically in this browser &middot; use Export save to back up or share the file</footer>
+</div>
+
+<script>
+const CATS = [
+  {id:'natty',   label:'Won natty',              pts:5,  type:'toggle'},
+  {id:'heisman', label:'Heisman winner',          pts:3,  type:'toggle'},
+  {id:'confChamp',label:'Conference championship',pts:1,  type:'toggle'},
+  {id:'playoffWins',label:'Playoff wins',         pts:1,  type:'count'},
+  {id:'topOff',  label:'Top offense (PPG)',       pts:1,  type:'toggle'},
+  {id:'topDef',  label:'Top defense (PPG allowed)',pts:1, type:'toggle'},
+  {id:'h2hWins', label:'Head-to-head wins',       pts:1,  type:'count'},
+  {id:'top25Wins',label:'Top-25 wins',            pts:1,  type:'count'},
+  {id:'topRecruit',label:'#1 recruiting class',   pts:1,  type:'toggle'},
+  {id:'top25Recruit',label:'Top-25 recruiting class',pts:1,type:'toggle'},
+  {id:'mostTO',  label:'Most turnovers',          pts:-1, type:'toggle'},
+  {id:'belowHalf',label:'Below top half of conf', pts:-1, type:'toggle'},
+];
+const COLORS = {Lukas:'#8a2432', Noah:'#5a2d81', Caleb:'#0a6640'};
+const PLAYERS = ['Lukas','Noah','Caleb'];
+
+function blankEntry(){ const e={}; CATS.forEach(c=>e[c.id]=c.type==='count'?0:false); return e; }
+function defaultState(){
+  return {
+    seasonNum: 1,
+    teams: {Lukas:'Texas State', Noah:'James Madison', Caleb:'North Dakota State'},
+    current: {Lukas:blankEntry(), Noah:blankEntry(), Caleb:blankEntry()},
+    history: []
+  };
+}
+let state = defaultState();
+let syncing = false;
+
+async function load(){
+  // Try the shared cloud store first so every device sees the same data.
+  try{
+    const res = await fetch('/.netlify/functions/state', {cache:'no-store'});
+    if(res.ok){
+      const s = await res.json();
+      if(s && s.current){
+        localStorage.setItem('dynastyTrackerCache', JSON.stringify(s));
+        return s;
+      }
+    }
+  }catch(e){}
+  // Offline / function unavailable: fall back to the last known copy on this device.
+  try{ const c=JSON.parse(localStorage.getItem('dynastyTrackerCache')); if(c && c.current) return c; }catch(e){}
+  try{ const legacy=JSON.parse(localStorage.getItem('dynastyTracker')); if(legacy && legacy.current) return legacy; }catch(e){}
+  return defaultState();
+}
+
+function save(){
+  localStorage.setItem('dynastyTrackerCache', JSON.stringify(state));
+  fetch('/.netlify/functions/state', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(state)
+  }).catch(()=>{ setSyncBadge(false); });
+}
+
+function setSyncBadge(ok){
+  const el = document.getElementById('syncBadge');
+  if(!el) return;
+  el.textContent = ok ? 'Synced' : 'Offline (saved on this device only)';
+  el.style.color = ok ? '#c8dccb' : '#f2c9a8';
+}
+
+async function refreshFromCloud(){
+  if(syncing) return;
+  syncing = true;
+  const fresh = await load();
+  state = fresh;
+  renderSeason(); renderHome();
+  setSyncBadge(true);
+  syncing = false;
+}
+window.addEventListener('focus', refreshFromCloud);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refreshFromCloud(); });
+
+function entryScore(e){
+  return CATS.reduce((sum,c)=> sum + c.pts * (c.type==='count' ? (e[c.id]||0) : (e[c.id]?1:0)), 0);
+}
+function totalScore(p){
+  return state.history.reduce((s,h)=>s+(h.scores[p]||0),0) + entryScore(state.current[p]);
+}
+
+function showTab(t){
+  ['home','season','key'].forEach(x=>{
+    document.getElementById('page-'+x).style.display = x===t?'':'none';
+    document.getElementById('tab-'+x).classList.toggle('active', x===t);
+  });
+  if(t==='home') renderHome();
+}
+
+let chart=null;
+function renderHome(){
+  const totals = PLAYERS.map(p=>({p, total: totalScore(p)}));
+  const best = Math.max(...totals.map(t=>t.total));
+  document.getElementById('kpiRow').innerHTML = totals.map(({p,total})=>`
+    <div class="kpi" style="--accent:${COLORS[p]}">
+      <div class="name">${p} ${total===best && state.history.length+entryScore(state.current[p])!==0 && best!==0?'<span class="rank">&#128081;</span>':''}</div>
+      <div class="team">${state.teams[p]||'&mdash;'}</div>
+      <div class="score">${total}</div>
+      <div class="rank">${total} total pts &middot; ${entryScore(state.current[p])} this season</div>
+    </div>`).join('');
+
+  const labels = state.history.map(h=>'S'+h.season).concat(['S'+state.seasonNum+' (live)']);
+  const datasets = PLAYERS.map(p=>({
+    label:p,
+    data: state.history.map(h=>h.scores[p]).concat([entryScore(state.current[p])]),
+    borderColor:COLORS[p], backgroundColor:COLORS[p],
+    borderWidth:2.5, tension:.3, pointRadius:4, pointHoverRadius:6
+  }));
+  if(chart) chart.destroy();
+  chart = new Chart(document.getElementById('seasonChart'), {
+    type:'line',
+    data:{labels, datasets},
+    options:{responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'top',labels:{usePointStyle:true,padding:16}}},
+      scales:{x:{grid:{display:false}}, y:{beginAtZero:true, ticks:{stepSize:1}}}}
+  });
+
+  const ht = document.getElementById('historyTable');
+  if(!state.history.length){
+    ht.innerHTML = '<div class="empty">No seasons finalized yet &mdash; season '+state.seasonNum+' is in progress.</div>';
+  } else {
+    ht.innerHTML = '<table><tr><th>Season</th>'+PLAYERS.map(p=>'<th>'+p+'</th>').join('')+'<th>Season winner</th></tr>'+
+      state.history.map(h=>{
+        const mx = Math.max(...PLAYERS.map(p=>h.scores[p]));
+        const winners = PLAYERS.filter(p=>h.scores[p]===mx);
+        return '<tr><td>Season '+h.season+'</td>'+
+          PLAYERS.map(p=>'<td class="'+(h.scores[p]===mx?'leader':'')+'">'+h.scores[p]+'<span style="color:var(--muted);font-size:11px"> ('+(h.teams[p]||'')+')</span></td>').join('')+
+          '<td>'+winners.join(', ')+'</td></tr>';
+      }).join('')+'</table>';
+  }
+}
+
+function renderSeason(){
+  document.getElementById('seasonLabel').textContent = 'Season '+state.seasonNum;
+  document.getElementById('undoCard').style.display = state.history.length ? '' : 'none';
+  document.getElementById('seasonGrid').innerHTML = PLAYERS.map(p=>{
+    const e = state.current[p];
+    const rows = CATS.map(c=>{
+      const neg = c.pts<0;
+      const badge = `<span class="pts${neg?' minus':''}">${c.pts>0?'+':''}${c.pts}${c.type==='count'?' ea':''}</span>`;
+      const ctrl = c.type==='toggle'
+        ? `<button class="tgl${e[c.id]?' on':''}${neg?' neg':''}" onclick="toggleCat('${p}','${c.id}')" aria-label="${c.label}"></button>`
+        : `<div class="stepper"><button onclick="bump('${p}','${c.id}',-1)">&minus;</button><span class="val">${e[c.id]}</span><button onclick="bump('${p}','${c.id}',1)">+</button></div>`;
+      return `<div class="row"><span class="lbl">${badge} ${c.label}</span>${ctrl}</div>`;
+    }).join('');
+    return `<div class="pcard" style="--accent:${COLORS[p]}">
+      <div class="phead"><span class="nm">${p}</span><span class="sc" id="sc-${p}">${entryScore(e)}</span></div>
+      <div class="team-edit">Team <input value="${(state.teams[p]||'').replace(/"/g,'&quot;')}" onchange="setTeam('${p}',this.value)"></div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+function toggleCat(p,id){ state.current[p][id]=!state.current[p][id]; save(); renderSeason(); }
+function bump(p,id,d){ state.current[p][id]=Math.max(0,(state.current[p][id]||0)+d); save(); renderSeason(); }
+function setTeam(p,v){ state.teams[p]=v.trim(); save(); }
+
+function finalizeSeason(){
+  const scores={}, breakdown={};
+  PLAYERS.forEach(p=>{ scores[p]=entryScore(state.current[p]); breakdown[p]={...state.current[p]}; });
+  if(!confirm('Finalize season '+state.seasonNum+'?\n\n'+PLAYERS.map(p=>p+': '+scores[p]+' pts').join('\n')+'\n\nThis locks it into history and starts season '+(state.seasonNum+1)+'.')) return;
+  state.history.push({season:state.seasonNum, teams:{...state.teams}, scores, breakdown});
+  state.seasonNum++;
+  state.current = {Lukas:blankEntry(), Noah:blankEntry(), Caleb:blankEntry()};
+  save(); renderSeason(); showTab('home');
+}
+
+function undoFinalize(){
+  if(!state.history.length) return;
+  const last = state.history[state.history.length-1];
+  if(!confirm('Reopen season '+last.season+'? Current unfinalized entries for season '+state.seasonNum+' will be lost.')) return;
+  state.history.pop();
+  state.seasonNum = last.season;
+  state.current = last.breakdown;
+  state.teams = last.teams;
+  save(); renderSeason();
+}
+
+function exportData(){
+  const blob = new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'dynasty_save_season'+state.seasonNum+'.json';
+  a.click();
+}
+function importData(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const s = JSON.parse(r.result);
+      if(!s.current || !s.teams) throw 0;
+      state = s; save(); renderSeason(); showTab('home');
+    }catch(e){ alert('That file doesn\'t look like a dynasty save.'); }
+    ev.target.value='';
+  };
+  r.readAsText(f);
+}
+
+(async function init(){
+  state = await load();
+  setSyncBadge(true);
+  renderSeason();
+  renderHome();
+})();
+</script>
+</body>
+</html>
