@@ -69,6 +69,19 @@ tr:last-child td{border-bottom:none}
 .chart-box{position:relative;height:280px}
 .empty{color:var(--muted);font-size:13.5px;font-style:italic}
 footer{text-align:center;font-size:11.5px;color:var(--muted);padding:8px 0 20px}
+.bd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.bd-player{border:1px solid var(--line);border-radius:8px;overflow:hidden;border-top:3px solid var(--accent);background:var(--card)}
+.bd-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;font-weight:700;font-size:13.5px;background:#fafbf9;border-bottom:1px solid var(--line)}
+.bd-head .tm{color:var(--muted);font-weight:400;font-size:11.5px}
+.bd-line{display:flex;justify-content:space-between;gap:8px;padding:6px 12px;font-size:13px;border-bottom:1px solid #f4f5f2}
+.bd-line:last-child{border-bottom:none}
+.bd-line .v{font-weight:700;color:var(--pos);white-space:nowrap}
+.bd-line .v.minus{color:var(--neg)}
+.bd-none{padding:10px 12px;font-size:12.5px;color:var(--muted);font-style:italic}
+tr.hist-row td{cursor:pointer}
+tr.hist-row td:first-child::before{content:'\25B8  ';color:var(--muted);font-size:11px}
+tr.hist-row.open td:first-child::before{content:'\25BE  '}
+tr.hist-detail td{background:#fafbf9;padding:12px}
 @media(max-width:640px){.kpi .score{font-size:28px}}
 </style>
 </head>
@@ -89,6 +102,7 @@ footer{text-align:center;font-size:11.5px;color:var(--muted);padding:8px 0 20px}
   <nav>
     <button id="tab-home" class="active" onclick="showTab('home')">Home</button>
     <button id="tab-season" onclick="showTab('season')">Current season</button>
+    <button id="tab-breakdowns" onclick="showTab('breakdowns')">Breakdowns</button>
     <button id="tab-key" onclick="showTab('key')">Point key</button>
   </nav>
 
@@ -117,6 +131,10 @@ footer{text-align:center;font-size:11.5px;color:var(--muted);padding:8px 0 20px}
         <button class="btn ghost" onclick="undoFinalize()">Reopen last season</button>
       </div>
     </div>
+  </div>
+
+  <div id="page-breakdowns" style="display:none">
+    <div id="breakdownList"></div>
   </div>
 
   <div id="page-key" style="display:none">
@@ -213,6 +231,7 @@ async function refreshFromCloud(){
   const fresh = await load();
   state = fresh;
   renderSeason(); renderHome();
+  if(document.getElementById('page-breakdowns').style.display!=='none') renderBreakdowns();
   setSyncBadge(true);
   syncing = false;
 }
@@ -227,11 +246,56 @@ function totalScore(p){
 }
 
 function showTab(t){
-  ['home','season','key'].forEach(x=>{
+  ['home','season','breakdowns','key'].forEach(x=>{
     document.getElementById('page-'+x).style.display = x===t?'':'none';
     document.getElementById('tab-'+x).classList.toggle('active', x===t);
   });
   if(t==='home') renderHome();
+  if(t==='breakdowns') renderBreakdowns();
+}
+
+// ----- Point breakdowns -----
+function earnedLines(e){
+  const out=[];
+  CATS.forEach(c=>{
+    if(c.type==='count'){
+      const n=e[c.id]||0;
+      if(n>0) out.push({label:c.label+(n>1?' ×'+n:''), pts:c.pts*n});
+    } else if(e[c.id]){
+      out.push({label:c.label, pts:c.pts});
+    }
+  });
+  return out;
+}
+function linesHTML(e){
+  if(!e) return '<div class="bd-none">No detail recorded for this season</div>';
+  const lines=earnedLines(e);
+  if(!lines.length) return '<div class="bd-none">No points earned</div>';
+  return lines.map(l=>'<div class="bd-line"><span>'+l.label+'</span><span class="v'+(l.pts<0?' minus':'')+'">'+(l.pts>0?'+':'')+l.pts+'</span></div>').join('');
+}
+function playerBreakdownCard(p, entry, teams, score){
+  return '<div class="bd-player" style="--accent:'+COLORS[p]+'">'+
+    '<div class="bd-head"><span>'+p+' <span class="tm">'+((teams&&teams[p])||'')+'</span></span><span>'+score+'</span></div>'+
+    linesHTML(entry)+'</div>';
+}
+function seasonBreakdownGrid(entries, teams, scores){
+  return '<div class="bd-grid">'+PLAYERS.map(p=>playerBreakdownCard(p, entries?entries[p]:null, teams, scores[p])).join('')+'</div>';
+}
+function renderBreakdowns(){
+  const curScores={}; PLAYERS.forEach(p=>curScores[p]=entryScore(state.current[p]));
+  let html='<div class="card"><h2>Season '+state.seasonNum+' <span style="color:var(--muted);font-weight:400">(in progress)</span></h2>'+
+    seasonBreakdownGrid(state.current, state.teams, curScores)+'</div>';
+  [...state.history].reverse().forEach(h=>{
+    html+='<div class="card"><h2>Season '+h.season+'</h2>'+seasonBreakdownGrid(h.breakdown, h.teams, h.scores)+'</div>';
+  });
+  document.getElementById('breakdownList').innerHTML=html;
+}
+function toggleHist(season){
+  const d=document.getElementById('hist-detail-'+season);
+  if(!d) return;
+  const open = d.style.display==='none';
+  d.style.display = open?'':'none';
+  d.previousElementSibling.classList.toggle('open', open);
 }
 
 let chart=null;
@@ -271,10 +335,13 @@ function renderHome(){
       state.history.map(h=>{
         const mx = Math.max(...PLAYERS.map(p=>h.scores[p]));
         const winners = PLAYERS.filter(p=>h.scores[p]===mx);
-        return '<tr><td>Season '+h.season+'</td>'+
+        return '<tr class="hist-row" onclick="toggleHist('+h.season+')"><td>Season '+h.season+'</td>'+
           PLAYERS.map(p=>'<td class="'+(h.scores[p]===mx?'leader':'')+'">'+h.scores[p]+'<span style="color:var(--muted);font-size:11px"> ('+(h.teams[p]||'')+')</span></td>').join('')+
-          '<td>'+winners.join(', ')+'</td></tr>';
-      }).join('')+'</table>';
+          '<td>'+winners.join(', ')+'</td></tr>'+
+          '<tr class="hist-detail" id="hist-detail-'+h.season+'" style="display:none"><td colspan="'+(PLAYERS.length+2)+'">'+
+          seasonBreakdownGrid(h.breakdown, h.teams, h.scores)+'</td></tr>';
+      }).join('')+'</table>'+
+      '<div class="note">Click a season to see how each player earned their points.</div>';
   }
 }
 
